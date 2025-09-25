@@ -4,6 +4,8 @@
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Helper function to get the role of the current user
+
 -- Create profiles table for healthcare providers
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -134,86 +136,6 @@ ALTER TABLE public.clinical_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.patient_alerts ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for profiles
-CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
-
--- RLS Policies for patients (healthcare providers can access all patients)
-CREATE POLICY "Healthcare providers can view all patients" ON public.patients FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can insert patients" ON public.patients FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can update patients" ON public.patients FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-
--- RLS Policies for medical_history
-CREATE POLICY "Healthcare providers can view medical history" ON public.medical_history FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can insert medical history" ON public.medical_history FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can update medical history" ON public.medical_history FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-
--- RLS Policies for medications
-CREATE POLICY "Healthcare providers can view medications" ON public.medications FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can insert medications" ON public.medications FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can update medications" ON public.medications FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-
--- RLS Policies for vital_signs
-CREATE POLICY "Healthcare providers can view vital signs" ON public.vital_signs FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can insert vital signs" ON public.vital_signs FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can update vital signs" ON public.vital_signs FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-
--- RLS Policies for appointments
-CREATE POLICY "Healthcare providers can view appointments" ON public.appointments FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can insert appointments" ON public.appointments FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can update appointments" ON public.appointments FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-
--- RLS Policies for clinical_notes
-CREATE POLICY "Healthcare providers can view clinical notes" ON public.clinical_notes FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can insert clinical notes" ON public.clinical_notes FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can update clinical notes" ON public.clinical_notes FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-
--- RLS Policies for patient_alerts
-CREATE POLICY "Healthcare providers can view patient alerts" ON public.patient_alerts FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can insert patient alerts" ON public.patient_alerts FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
-CREATE POLICY "Healthcare providers can update patient alerts" ON public.patient_alerts FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())
-);
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_patients_mrn ON public.patients(medical_record_number);
