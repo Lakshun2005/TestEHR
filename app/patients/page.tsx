@@ -27,6 +27,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { AddPatientDialog } from "@/components/add-patient-dialog"
 import { EditPatientDialog } from "@/components/edit-patient-dialog"
+import { ViewPatientDialog } from "@/components/view-patient-dialog"
 import { toast } from "sonner"
 
 // Sample data structure - align with your actual data
@@ -50,11 +51,18 @@ export default function PatientsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddPatientDialogOpen, setIsAddPatientDialogOpen] = useState(false)
   const [isEditPatientDialogOpen, setIsEditPatientDialogOpen] = useState(false)
+  const [isViewPatientDialogOpen, setIsViewPatientDialogOpen] = useState(false)
   const [selectedPatient, setSelectedPatient] = useState(null)
+  const [openMenuId, setOpenMenuId] = useState(null)
 
   const handleEditPatient = (patient) => {
     setSelectedPatient(patient)
     setIsEditPatientDialogOpen(true)
+  }
+
+  const handleViewDetails = (patient) => {
+    setSelectedPatient(patient)
+    setIsViewPatientDialogOpen(true)
   }
 
   const handlePatientUpdated = (updatedPatient) => {
@@ -233,14 +241,17 @@ export default function PatientsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
+                      <DropdownMenu
+                        open={openMenuId === patient.id}
+                        onOpenChange={(isOpen) => setOpenMenuId(isOpen ? patient.id : null)}
+                      >
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="w-8 h-8">
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>View Details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewDetails(patient)}>View Details</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEditPatient(patient)}>Edit Record</DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleDeletePatient(patient.id)}>Delete Patient</DropdownMenuItem>
@@ -261,10 +272,27 @@ export default function PatientsPage() {
       onPatientAdded={loadPatients}
     />
     {selectedPatient && (
+      <ViewPatientDialog
+        patient={selectedPatient}
+        open={isViewPatientDialogOpen}
+        onOpenChange={(isOpen) => {
+          setIsViewPatientDialogOpen(isOpen);
+          if (!isOpen) {
+            setSelectedPatient(null);
+          }
+        }}
+      />
+    )}
+    {selectedPatient && (
       <EditPatientDialog
         patient={selectedPatient}
         open={isEditPatientDialogOpen}
-        onOpenChange={setIsEditPatientDialogOpen}
+        onOpenChange={(isOpen) => {
+          setIsEditPatientDialogOpen(isOpen);
+          if (!isOpen) {
+            setSelectedPatient(null);
+          }
+        }}
         onPatientUpdated={handlePatientUpdated}
       />
     )}
