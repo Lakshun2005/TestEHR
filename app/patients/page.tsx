@@ -287,6 +287,7 @@ export default function PatientsPage() {
     />
     {selectedPatient && (
       <ViewPatientDialog
+        key={selectedPatient.id}
         patient={selectedPatient}
         open={isViewPatientDialogOpen}
         onOpenChange={(isOpen) => {
