@@ -77,6 +77,7 @@ export function AddPatientDialog({ open, onOpenChange, onPatientAdded }) {
               </Label>
               <Input
                 id="first-name"
+                name="first-name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 className="col-span-3"
@@ -89,6 +90,7 @@ export function AddPatientDialog({ open, onOpenChange, onPatientAdded }) {
               </Label>
               <Input
                 id="last-name"
+                name="last-name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 className="col-span-3"
@@ -101,6 +103,7 @@ export function AddPatientDialog({ open, onOpenChange, onPatientAdded }) {
               </Label>
               <Input
                 id="dob"
+                name="dob"
                 type="date"
                 value={dob}
                 onChange={(e) => setDob(e.target.value)}
@@ -114,6 +117,7 @@ export function AddPatientDialog({ open, onOpenChange, onPatientAdded }) {
               </Label>
               <select
                 id="gender"
+                name="gender"
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
                 className="col-span-3"

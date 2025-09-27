@@ -39,8 +39,8 @@ export function EditPatientDialog({ patient, open, onOpenChange, onPatientUpdate
   }, [patient])
 
   const handleChange = (e) => {
-    const { id, value } = e.target
-    setFormData((prev) => ({ ...prev, [id]: value }))
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleSubmit = async (e) => {
@@ -90,6 +90,7 @@ export function EditPatientDialog({ patient, open, onOpenChange, onPatientUpdate
               </Label>
               <Input
                 id="first_name"
+                name="first_name"
                 value={formData.first_name}
                 onChange={handleChange}
                 className="col-span-3"
@@ -102,6 +103,7 @@ export function EditPatientDialog({ patient, open, onOpenChange, onPatientUpdate
               </Label>
               <Input
                 id="last_name"
+                name="last_name"
                 value={formData.last_name}
                 onChange={handleChange}
                 className="col-span-3"
@@ -114,6 +116,7 @@ export function EditPatientDialog({ patient, open, onOpenChange, onPatientUpdate
               </Label>
               <Input
                 id="date_of_birth"
+                name="date_of_birth"
                 type="date"
                 value={formData.date_of_birth}
                 onChange={handleChange}
