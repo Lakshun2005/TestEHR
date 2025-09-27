@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   Search,
   Filter,
@@ -65,33 +65,14 @@ export default function PatientsPage() {
     setIsViewPatientDialogOpen(true)
   }
 
-  const handlePatientUpdated = (updatedPatient) => {
-    setPatients(patients.map((p) => (p.id === updatedPatient.id ? updatedPatient : p)))
-    loadPatients() // Refresh the list
-  }
-
-  const handleDeletePatient = async (patientId) => {
-    if (!window.confirm("Are you sure you want to delete this patient? This action cannot be undone.")) {
-      return
-    }
-
-    const supabase = createClient()
-    const { error } = await supabase.from("patients").delete().eq("id", patientId)
-
-    if (error) {
-      toast.error("Failed to delete patient.", { description: error.message })
-    } else {
-      toast.success("Patient deleted successfully.")
-      loadPatients()
-    }
-  }
-
-  const loadPatients = async () => {
-    setLoading(true)
-    const supabase = createClient()
-    let query = supabase
-      .from("patients")
-      .select(`
+  const loadPatients = useCallback(async () => {
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      let query = supabase
+        .from("patients")
+        .select(
+          `
         id,
         medical_record_number,
         first_name,
@@ -100,69 +81,102 @@ export default function PatientsPage() {
         phone,
         email,
         created_at
-      `)
-      .order("created_at", { ascending: false })
+      `
+        )
+        .order("created_at", { ascending: false });
 
-    if (searchTerm) {
-      query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,medical_record_number.ilike.%${searchTerm}%`)
-    }
+      if (searchTerm) {
+        query = query.or(
+          `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,medical_record_number.ilike.%${searchTerm}%`
+        );
+      }
 
-    const { data, error } = await query
+      const { data, error } = await query;
 
-    if (error) {
-      console.error("Error loading patients:", error);
-      setPatients(recentPatients); // Fallback to sample data
+      if (error) {
+        console.error("Error loading patients:", error);
+        setPatients(recentPatients); // Fallback to sample data
+      } else {
+        const patientIds = data.map((p) => p.id);
+        const { data: histories, error: historyError } = await supabase
+          .from("medical_history")
+          .select("*")
+          .in("patient_id", patientIds);
+
+        if (historyError) {
+          console.error("Error loading medical histories:", historyError);
+        }
+
+        const latestHistories = histories
+          ? histories.reduce((acc, history) => {
+              if (
+                !acc[history.patient_id] ||
+                new Date(history.diagnosis_date) >
+                  new Date(acc[history.patient_id].diagnosis_date)
+              ) {
+                acc[history.patient_id] = history;
+              }
+              return acc;
+            }, {})
+          : {};
+
+        const transformedPatients = data.map((patient) => {
+          const latestHistory = latestHistories[patient.id];
+          return {
+            id: patient.id,
+            mrn: patient.medical_record_number,
+            name: `${patient.first_name} ${patient.last_name}`,
+            age:
+              new Date().getFullYear() -
+              new Date(patient.date_of_birth).getFullYear(),
+            lastVisit: new Date(patient.created_at).toISOString().split("T")[0],
+            status: latestHistory?.status || "unknown",
+            riskLevel: latestHistory?.severity || "unknown",
+          };
+        });
+        setPatients(transformedPatients);
+      }
+    } finally {
       setLoading(false);
+    }
+  }, [searchTerm]);
+
+  const handlePatientUpdated = useCallback(() => {
+    loadPatients();
+  }, [loadPatients]);
+
+  const handleDeletePatient = async (patientId) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this patient? This action cannot be undone."
+      )
+    ) {
       return;
     }
 
-    const patientIds = data.map((p) => p.id);
-    const { data: histories, error: historyError } = await supabase
-      .from("medical_history")
-      .select("*")
-      .in("patient_id", patientIds);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("patients")
+      .delete()
+      .eq("id", patientId);
 
-    if (historyError) {
-      console.error("Error loading medical histories:", historyError);
+    if (error) {
+      toast.error("Failed to delete patient.", {
+        description: error.message,
+      });
+    } else {
+      toast.success("Patient deleted successfully.");
+      loadPatients();
     }
-
-    const latestHistories = histories
-      ? histories.reduce((acc, history) => {
-          if (
-            !acc[history.patient_id] ||
-            new Date(history.diagnosis_date) > new Date(acc[history.patient_id].diagnosis_date)
-          ) {
-            acc[history.patient_id] = history;
-          }
-          return acc;
-        }, {})
-      : {};
-
-    const transformedPatients = data.map((patient) => {
-      const latestHistory = latestHistories[patient.id];
-      return {
-        id: patient.id,
-        mrn: patient.medical_record_number,
-        name: `${patient.first_name} ${patient.last_name}`,
-        age: new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear(),
-        lastVisit: new Date(patient.created_at).toISOString().split("T")[0],
-        status: latestHistory?.status || "unknown",
-        riskLevel: latestHistory?.severity || "unknown",
-      };
-    });
-
-    setPatients(transformedPatients);
-    setLoading(false);
   };
-
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-        loadPatients()
-    }, 500) // Debounce search input
+      loadPatients();
+    }, 500); // Debounce search input
 
-    return () => clearTimeout(debounceTimer)
-  }, [searchTerm])
+    return () => clearTimeout(debounceTimer);
+  }, [loadPatients]);
 
   return (
     <>
