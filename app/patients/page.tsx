@@ -251,10 +251,10 @@ export default function PatientsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewDetails(patient)}>View Details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditPatient(patient)}>Edit Record</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => handleViewDetails(patient)}>View Details</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => handleEditPatient(patient)}>Edit Record</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleDeletePatient(patient.id)}>Delete Patient</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => handleDeletePatient(patient.id)} className="text-red-600">Delete Patient</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
