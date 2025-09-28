@@ -1,0 +1,191 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Enums for defining specific value sets across the schema.
+
+// User roles
+enum Role {
+  ADMIN
+  DOCTOR
+  NURSE
+  PATIENT
+}
+
+// Status for appointments
+enum AppointmentStatus {
+  PENDING
+  BOOKED
+  ARRIVED
+  CANCELLED
+}
+
+// Gender identity for patients
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNKNOWN
+}
+
+// Status for tasks
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+// Severity level for medical conditions
+enum Severity {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+// Status for medical history
+enum MedicalHistoryStatus {
+  STABLE
+  CRITICAL
+}
+
+/// Core models for users and patients, aligned with FHIR R4 principles.
+
+model User {
+  id          String        @id @default(cuid())
+  email       String        @unique
+  name        String?
+  role        Role
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relationships
+  appointments    Appointment[]
+  authoredNotes   ClinicalNote[]
+  tasksAssigned   Task[]
+  sentMessages    Message[]      @relation("SentMessages")
+  receivedMessages Message[]      @relation("ReceivedMessages")
+  auditLogs       AuditLog[]
+}
+
+model Patient {
+  id                    String        @id @default(cuid())
+  medicalRecordNumber   String        @unique
+  firstName             String
+  lastName              String
+  dateOfBirth           DateTime
+  gender                Gender
+  phone                 String?
+  email                 String?       @unique
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  // Relationships
+  appointments    Appointment[]
+  medicalHistory  MedicalHistory[]
+  clinicalNotes   ClinicalNote[]
+  documents       Document[]
+}
+
+/// Models related to patient care and clinical data.
+
+model Appointment {
+  id          String            @id @default(cuid())
+  date        DateTime
+  status      AppointmentStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relationships
+  patient     Patient           @relation(fields: [patientId], references: [id])
+  patientId   String
+  provider    User              @relation(fields: [providerId], references: [id])
+  providerId  String
+}
+
+model MedicalHistory {
+  id            String               @id @default(cuid())
+  diagnosis     String
+  diagnosisDate DateTime
+  treatment     String
+  status        MedicalHistoryStatus
+  severity      Severity
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  // Relationships
+  patient       Patient              @relation(fields: [patientId], references: [id])
+  patientId     String
+}
+
+model ClinicalNote {
+  id        String   @id @default(cuid())
+  type      String // e.g., 'SOAP Note', 'Discharge Summary'
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  patientId String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+}
+
+/// Supporting models for documentation, communication, workflow, and auditing.
+
+model Document {
+  id           String   @id @default(cuid())
+  documentType String
+  url          String // URL to the file in Supabase Storage
+  content      String?  @db.Text // Optional text content or summary
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  patient      Patient  @relation(fields: [patientId], references: [id])
+  patientId    String
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  content     String   @db.Text
+  timestamp   DateTime @default(now())
+
+  // Relationships
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
+  senderId    String
+  recipient   User     @relation("ReceivedMessages", fields: [recipientId], references: [id])
+  recipientId String
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  description String
+  status      TaskStatus @default(PENDING)
+  dueDate     DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relationships
+  assignedTo  User       @relation(fields: [assignedToId], references: [id])
+  assignedToId String
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  entity    String // e.g., 'Patient', 'Appointment'
+  timestamp DateTime @default(now())
+
+  // Relationships
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+}
