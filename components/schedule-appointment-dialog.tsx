@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Dialog,
   DialogContent,
@@ -12,61 +12,77 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import {
+  addAppointment,
+  getPatientsForAppointment,
+  getProvidersForAppointment,
+} from "@/app/appointments/actions"
+import { AppointmentStatus } from "@prisma/client"
 
-export function ScheduleAppointmentDialog({ open, onOpenChange, onAppointmentScheduled }) {
-  const [patients, setPatients] = useState([])
-  const [providers, setProviders] = useState([])
-  const [selectedPatient, setSelectedPatient] = useState("")
-  const [selectedProvider, setSelectedProvider] = useState("")
-  const [appointmentDate, setAppointmentDate] = useState("")
-  const [appointmentType, setAppointmentType] = useState("routine_checkup")
+interface ScheduleAppointmentDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onAppointmentScheduled: () => void
+}
+
+interface Patient {
+  id: string
+  name: string
+}
+
+interface Provider {
+  id: string
+  name: string | null
+}
+
+export function ScheduleAppointmentDialog({
+  open,
+  onOpenChange,
+  onAppointmentScheduled,
+}: ScheduleAppointmentDialogProps) {
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [providers, setProviders] = useState<Provider[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
-    const loadData = async () => {
-      const supabase = createClient()
-      const { data: patientsData, error: patientsError } = await supabase.from("patients").select("id, first_name, last_name")
-      if (patientsError) console.error("Error loading patients", patientsError)
-      else setPatients(patientsData)
-
-      const { data: providersData, error: providersError } = await supabase.from("profiles").select("id, first_name, last_name")
-      if (providersError) console.error("Error loading providers", providersError)
-      else setProviders(providersData)
+    async function loadData() {
+      try {
+        const [patientsData, providersData] = await Promise.all([
+          getPatientsForAppointment(),
+          getProvidersForAppointment(),
+        ])
+        setPatients(patientsData)
+        setProviders(providersData)
+      } catch (error) {
+        toast.error("Failed to load data for scheduling.")
+        console.error("Error loading scheduling data:", error)
+      }
     }
     if (open) {
       loadData()
     }
   }, [open])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
     setIsSubmitting(true)
 
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("appointments")
-      .insert([
-        {
-          patient_id: selectedPatient,
-          provider_id: selectedProvider,
-          appointment_date: appointmentDate,
-          appointment_type: appointmentType,
-        },
-      ])
-      .select()
+    const formData = new FormData(event.currentTarget)
+    const result = await addAppointment(formData)
 
     setIsSubmitting(false)
 
-    if (error) {
-      toast.error("Could not schedule appointment", {
-        description: error.message,
-      })
-    } else {
+    if (result.success) {
       toast.success("Appointment scheduled successfully.")
       onAppointmentScheduled()
       onOpenChange(false)
+      formRef.current?.reset()
+    } else {
+      toast.error("Could not schedule appointment", {
+        description: result.message,
+      })
     }
   }
 
@@ -75,37 +91,61 @@ export function ScheduleAppointmentDialog({ open, onOpenChange, onAppointmentSch
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Schedule New Appointment</DialogTitle>
-          <DialogDescription>
-            Fill in the details to schedule a new appointment.
-          </DialogDescription>
+          <DialogDescription>Fill in the details to schedule a new appointment.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form ref={formRef} onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="patient" className="text-right">Patient</Label>
-              <select id="patient" value={selectedPatient} onChange={(e) => setSelectedPatient(e.target.value)} className="col-span-3" required>
-                <option value="" disabled>Select a patient</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
+              <Label htmlFor="patientId" className="text-right">
+                Patient
+              </Label>
+              <select id="patientId" name="patientId" className="col-span-3" required>
+                <option value="" disabled>
+                  Select a patient
+                </option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="provider" className="text-right">Provider</Label>
-              <select id="provider" value={selectedProvider} onChange={(e) => setSelectedProvider(e.target.value)} className="col-span-3" required>
-                <option value="" disabled>Select a provider</option>
-                {providers.map(p => <option key={p.id} value={p.id}>Dr. {p.first_name} {p.last_name}</option>)}
+              <Label htmlFor="providerId" className="text-right">
+                Provider
+              </Label>
+              <select id="providerId" name="providerId" className="col-span-3" required>
+                <option value="" disabled>
+                  Select a provider
+                </option>
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="date" className="text-right">Date & Time</Label>
-              <Input id="date" type="datetime-local" value={appointmentDate} onChange={(e) => setAppointmentDate(e.target.value)} className="col-span-3" required />
+              <Label htmlFor="date" className="text-right">
+                Date & Time
+              </Label>
+              <Input id="date" name="date" type="datetime-local" className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="type" className="text-right">Type</Label>
-              <select id="type" value={appointmentType} onChange={(e) => setAppointmentType(e.target.value)} className="col-span-3" required>
-                <option value="routine_checkup">Routine Check-up</option>
-                <option value="follow_up">Follow-up</option>
-                <option value="consultation">Consultation</option>
-                <option value="procedure">Procedure</option>
+              <Label htmlFor="status" className="text-right">
+                Status
+              </Label>
+              <select
+                id="status"
+                name="status"
+                defaultValue={AppointmentStatus.BOOKED}
+                className="col-span-3"
+                required
+              >
+                <option value={AppointmentStatus.BOOKED}>Booked</option>
+                <option value={AppointmentStatus.PENDING}>Pending</option>
+                <option value={AppointmentStatus.ARRIVED}>Arrived</option>
+                <option value={AppointmentStatus.CANCELLED}>Cancelled</option>
               </select>
             </div>
           </div>

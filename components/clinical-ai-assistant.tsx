@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Brain,
   AlertTriangle,
@@ -21,42 +22,25 @@ import {
   XCircle,
   Loader2,
 } from "lucide-react"
+import { toast } from "sonner"
+import { getPatientsForAIAssistant, getPatientDetailsForAI } from "@/app/clinical-ai/actions"
 
+// ... (Interface definitions remain the same)
 interface ClinicalAssessment {
   riskLevel: "low" | "medium" | "high" | "critical"
   primaryConcerns: string[]
-  recommendations: Array<{
-    category: string
-    priority: string
-    action: string
-    rationale: string
-  }>
-  differentialDiagnosis: Array<{
-    condition: string
-    probability: string
-    supportingFactors: string[]
-    additionalTests?: string[]
-  }>
-  alerts: Array<{
-    type: string
-    severity: string
-    message: string
-    action: string
-  }>
+  recommendations: Array<{ category: string; priority: string; action: string; rationale: string; }>
+  differentialDiagnosis: Array<{ condition: string; probability: string; supportingFactors: string[]; additionalTests?: string[]; }>
+  alerts: Array<{ type: string; severity: string; message: string; action: string; }>
 }
-
 interface DrugInteraction {
-  interactions: Array<{
-    drug1: string
-    drug2: string
-    severity: string
-    description: string
-    clinicalEffect: string
-    management: string
-    alternatives?: string[]
-  }>
+  interactions: Array<{ drug1: string; drug2: string; severity: string; description: string; clinicalEffect: string; management: string; alternatives?: string[]; }>
   overallRisk: string
   recommendations: string[]
+}
+interface PatientSelectItem {
+  id: string
+  name: string
 }
 
 export function ClinicalAIAssistant() {
@@ -65,6 +49,10 @@ export function ClinicalAIAssistant() {
   const [assessment, setAssessment] = useState<ClinicalAssessment | null>(null)
   const [drugInteractions, setDrugInteractions] = useState<DrugInteraction | null>(null)
   const [diagnosticSuggestions, setDiagnosticSuggestions] = useState<string>("")
+
+  // Data state
+  const [patients, setPatients] = useState<PatientSelectItem[]>([])
+  const [selectedPatientId, setSelectedPatientId] = useState<string | undefined>()
 
   // Form states
   const [patientAge, setPatientAge] = useState("")
@@ -75,7 +63,40 @@ export function ClinicalAIAssistant() {
   const [newMedication, setNewMedication] = useState("")
   const [vitals, setVitals] = useState("")
 
+  useEffect(() => {
+    async function loadPatients() {
+      const patientsData = await getPatientsForAIAssistant()
+      setPatients(patientsData)
+    }
+    loadPatients()
+  }, [])
+
+  useEffect(() => {
+    async function loadPatientDetails() {
+      if (!selectedPatientId) {
+        // Clear form if no patient is selected
+        setPatientAge("")
+        setPatientGender("")
+        setMedicalHistory("")
+        setCurrentMedications("")
+        return
+      }
+      const details = await getPatientDetailsForAI(selectedPatientId)
+      if (details) {
+        setPatientAge(details.age)
+        setPatientGender(details.gender)
+        setMedicalHistory(details.medicalHistory)
+        setCurrentMedications(details.currentMedications)
+      }
+    }
+    loadPatientDetails()
+  }, [selectedPatientId])
+
   const handleClinicalAssessment = async () => {
+    if (!selectedPatientId) {
+      toast.warning("Please select a patient first.")
+      return
+    }
     setLoading(true)
     try {
       const response = await fetch("/api/clinical-ai", {
@@ -84,10 +105,7 @@ export function ClinicalAIAssistant() {
         body: JSON.stringify({
           type: "clinical_assessment",
           data: {
-            patientData: {
-              age: patientAge,
-              gender: patientGender,
-            },
+            patientData: { age: patientAge, gender: patientGender },
             symptoms: symptoms.split(",").map((s) => s.trim()),
             vitals: vitals ? JSON.parse(vitals) : {},
             medicalHistory: medicalHistory.split(",").map((h) => h.trim()),
@@ -99,11 +117,13 @@ export function ClinicalAIAssistant() {
       setAssessment(result.assessment)
     } catch (error) {
       console.error("Error:", error)
+      toast.error("Failed to generate assessment.")
     } finally {
       setLoading(false)
     }
   }
 
+  // ... (other handlers remain the same)
   const handleDrugInteractionCheck = async () => {
     setLoading(true)
     try {
@@ -154,153 +174,88 @@ export function ClinicalAIAssistant() {
 
   const getRiskLevelColor = (level: string) => {
     switch (level) {
-      case "low":
-        return "bg-chart-2/10 text-chart-2"
-      case "medium":
-        return "bg-chart-3/10 text-chart-3"
-      case "high":
-        return "bg-chart-4/10 text-chart-4"
-      case "critical":
-        return "bg-destructive/10 text-destructive"
-      default:
-        return "bg-muted text-muted-foreground"
+      case "low": return "bg-chart-2/10 text-chart-2"
+      case "medium": return "bg-chart-3/10 text-chart-3"
+      case "high": return "bg-chart-4/10 text-chart-4"
+      case "critical": return "bg-destructive/10 text-destructive"
+      default: return "bg-muted text-muted-foreground"
     }
   }
 
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
-      case "low":
-        return <CheckCircle className="w-4 h-4 text-chart-2" />
-      case "medium":
-        return <Clock className="w-4 h-4 text-chart-3" />
-      case "high":
-        return <AlertTriangle className="w-4 h-4 text-chart-4" />
-      case "critical":
-        return <XCircle className="w-4 h-4 text-destructive" />
-      default:
-        return <CheckCircle className="w-4 h-4 text-muted-foreground" />
+      case "low": return <CheckCircle className="w-4 h-4 text-chart-2" />
+      case "medium": return <Clock className="w-4 h-4 text-chart-3" />
+      case "high": return <AlertTriangle className="w-4 h-4 text-chart-4" />
+      case "critical": return <XCircle className="w-4 h-4 text-destructive" />
+      default: return <CheckCircle className="w-4 h-4 text-muted-foreground" />
     }
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
           <Brain className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">AI Clinical Decision Support</h2>
+          <h2 className="text-2xl font-semibold">AI Clinical Decision Support</h2>
           <p className="text-muted-foreground">Intelligent assistance for clinical decision making</p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="assessment" className="flex items-center gap-2">
-            <Stethoscope className="w-4 h-4" />
-            Clinical Assessment
-          </TabsTrigger>
-          <TabsTrigger value="interactions" className="flex items-center gap-2">
-            <Pill className="w-4 h-4" />
-            Drug Interactions
-          </TabsTrigger>
-          <TabsTrigger value="diagnostics" className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Diagnostic Assistance
-          </TabsTrigger>
+          <TabsTrigger value="assessment"><Stethoscope className="w-4 h-4 mr-2" />Clinical Assessment</TabsTrigger>
+          <TabsTrigger value="interactions"><Pill className="w-4 h-4 mr-2" />Drug Interactions</TabsTrigger>
+          <TabsTrigger value="diagnostics"><FileText className="w-4 h-4 mr-2" />Diagnostic Assistance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="assessment" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Patient Information & Clinical Assessment</CardTitle>
-              <CardDescription>
-                Enter patient data to receive AI-powered clinical insights and recommendations
-              </CardDescription>
+              <CardDescription>Select a patient and provide symptoms to get AI-powered insights.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="age">Patient Age</Label>
-                  <Input
-                    id="age"
-                    value={patientAge}
-                    onChange={(e) => setPatientAge(e.target.value)}
-                    placeholder="e.g., 45"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="gender">Gender</Label>
-                  <Input
-                    id="gender"
-                    value={patientGender}
-                    onChange={(e) => setPatientGender(e.target.value)}
-                    placeholder="e.g., Male, Female"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="patient-select">Select Patient</Label>
+                <Select value={selectedPatientId} onValueChange={setSelectedPatientId}>
+                  <SelectTrigger id="patient-select">
+                    <SelectValue placeholder="Select a patient..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {patients.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="symptoms">Current Symptoms</Label>
-                <Textarea
-                  id="symptoms"
-                  value={symptoms}
-                  onChange={(e) => setSymptoms(e.target.value)}
-                  placeholder="Enter symptoms separated by commas (e.g., chest pain, shortness of breath, fatigue)"
-                  rows={3}
-                />
+                <Textarea id="symptoms" value={symptoms} onChange={(e) => setSymptoms(e.target.value)} placeholder="Enter symptoms separated by commas..." rows={3} />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="history">Medical History</Label>
-                <Textarea
-                  id="history"
-                  value={medicalHistory}
-                  onChange={(e) => setMedicalHistory(e.target.value)}
-                  placeholder="Enter medical conditions separated by commas (e.g., hypertension, diabetes, asthma)"
-                  rows={2}
-                />
+                <Label htmlFor="history">Medical History (auto-populated)</Label>
+                <Textarea id="history" value={medicalHistory} readOnly className="bg-muted/50" rows={2} />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="medications">Current Medications</Label>
-                <Textarea
-                  id="medications"
-                  value={currentMedications}
-                  onChange={(e) => setCurrentMedications(e.target.value)}
-                  placeholder="Enter medications separated by commas (e.g., lisinopril 10mg, metformin 500mg)"
-                  rows={2}
-                />
+                <Label htmlFor="medications">Current Medications (auto-populated)</Label>
+                <Textarea id="medications" value={currentMedications} readOnly className="bg-muted/50" rows={2} />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="vitals">Vital Signs (JSON format)</Label>
-                <Textarea
-                  id="vitals"
-                  value={vitals}
-                  onChange={(e) => setVitals(e.target.value)}
-                  placeholder='{"bp_systolic": 140, "bp_diastolic": 90, "heart_rate": 85, "temperature": 98.6}'
-                  rows={2}
-                />
-              </div>
-
-              <Button onClick={handleClinicalAssessment} disabled={loading} className="w-full">
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Brain className="w-4 h-4 mr-2" />
-                    Generate Clinical Assessment
-                  </>
-                )}
+              <Button onClick={handleClinicalAssessment} disabled={loading || !selectedPatientId} className="w-full">
+                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Brain className="w-4 h-4 mr-2" />}
+                Generate Clinical Assessment
               </Button>
             </CardContent>
           </Card>
-
-          {assessment && (
+          {/* ... (assessment results display remains the same) ... */}
+           {assessment && (
             <div className="space-y-4">
               <Card>
                 <CardHeader>
@@ -412,8 +367,8 @@ export function ClinicalAIAssistant() {
             </div>
           )}
         </TabsContent>
-
-        <TabsContent value="interactions" className="space-y-6">
+        {/* ... (other tabs remain the same) ... */}
+         <TabsContent value="interactions" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Drug Interaction Checker</CardTitle>

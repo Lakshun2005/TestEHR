@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Dialog,
   DialogContent,
@@ -12,66 +12,48 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { updatePatient } from "@/app/patients/actions"
+import type { PatientWithDetails } from "@/app/patients/page"
+import { Gender } from "@prisma/client"
 
-export function EditPatientDialog({ patient, open, onOpenChange, onPatientUpdated }) {
-  const [formData, setFormData] = useState({
-    first_name: "",
-    last_name: "",
-    date_of_birth: "",
-  })
+interface EditPatientDialogProps {
+  patient: PatientWithDetails
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onPatientUpdated: () => void
+}
+
+export function EditPatientDialog({ patient, open, onOpenChange, onPatientUpdated }: EditPatientDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
 
-  useEffect(() => {
-    if (patient) {
-      const nameParts = patient.name.split(" ")
-      setFormData({
-        first_name: nameParts[0] || "",
-        last_name: nameParts.slice(1).join(" ") || "",
-        date_of_birth: patient.date_of_birth
-          ? new Date(patient.date_of_birth).toISOString().split("T")[0]
-          : new Date(new Date().setFullYear(new Date().getFullYear() - patient.age))
-              .toISOString()
-              .split("T")[0],
-      })
-    }
-  }, [patient])
-
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!patient) return
-
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
     setIsSubmitting(true)
-    const supabase = createClient()
 
-    const { data, error } = await supabase
-      .from("patients")
-      .update({
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        date_of_birth: formData.date_of_birth,
-      })
-      .eq("id", patient.id)
-      .select()
+    const formData = new FormData(event.currentTarget)
+    const result = await updatePatient(patient.id, formData)
 
     setIsSubmitting(false)
 
-    if (error) {
-      toast.error("Could not update patient", {
-        description: error.message,
-      })
-    } else {
+    if (result.success) {
       toast.success("Patient updated successfully.")
-      onPatientUpdated({ ...patient, ...formData, name: `${formData.first_name} ${formData.last_name}` })
+      onPatientUpdated()
       onOpenChange(false)
+    } else {
+      toast.error("Could not update patient", {
+        description: result.message,
+      })
     }
   }
+
+  // Reset form when dialog is closed or patient changes
+  useEffect(() => {
+    if (!open) {
+      formRef.current?.reset()
+    }
+  }, [open, patient])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -82,47 +64,60 @@ export function EditPatientDialog({ patient, open, onOpenChange, onPatientUpdate
             Update the patient's details below. Click save when you're done.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form ref={formRef} onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="first_name" className="text-right">
+              <Label htmlFor="firstName" className="text-right">
                 First Name
               </Label>
               <Input
-                id="first_name"
-                name="first_name"
-                value={formData.first_name}
-                onChange={handleChange}
+                id="firstName"
+                name="firstName"
+                defaultValue={patient.firstName}
                 className="col-span-3"
                 required
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="last_name" className="text-right">
+              <Label htmlFor="lastName" className="text-right">
                 Last Name
               </Label>
               <Input
-                id="last_name"
-                name="last_name"
-                value={formData.last_name}
-                onChange={handleChange}
+                id="lastName"
+                name="lastName"
+                defaultValue={patient.lastName}
                 className="col-span-3"
                 required
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="date_of_birth" className="text-right">
+              <Label htmlFor="dateOfBirth" className="text-right">
                 Date of Birth
               </Label>
               <Input
-                id="date_of_birth"
-                name="date_of_birth"
+                id="dateOfBirth"
+                name="dateOfBirth"
                 type="date"
-                value={formData.date_of_birth}
-                onChange={handleChange}
+                defaultValue={new Date(patient.dateOfBirth).toISOString().split("T")[0]}
                 className="col-span-3"
                 required
               />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="gender" className="text-right">
+                Gender
+              </Label>
+              <select
+                id="gender"
+                name="gender"
+                defaultValue={patient.gender}
+                className="col-span-3 border rounded-md p-2"
+              >
+                <option value={Gender.MALE}>Male</option>
+                <option value={Gender.FEMALE}>Female</option>
+                <option value={Gender.OTHER}>Other</option>
+                <option value={Gender.UNKNOWN}>Unknown</option>
+              </select>
             </div>
           </div>
           <DialogFooter>

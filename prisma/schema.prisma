@@ -8,6 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["public", "auth"]
 }
 
 /// Enums for defining specific value sets across the schema.
@@ -18,6 +19,8 @@ enum Role {
   DOCTOR
   NURSE
   PATIENT
+
+  @@schema("public")
 }
 
 // Status for appointments
@@ -26,6 +29,8 @@ enum AppointmentStatus {
   BOOKED
   ARRIVED
   CANCELLED
+
+  @@schema("public")
 }
 
 // Gender identity for patients
@@ -34,6 +39,8 @@ enum Gender {
   FEMALE
   OTHER
   UNKNOWN
+
+  @@schema("public")
 }
 
 // Status for tasks
@@ -41,6 +48,8 @@ enum TaskStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
+
+  @@schema("public")
 }
 
 // Severity level for medical conditions
@@ -48,12 +57,16 @@ enum Severity {
   HIGH
   MEDIUM
   LOW
+
+  @@schema("public")
 }
 
 // Status for medical history
 enum MedicalHistoryStatus {
   STABLE
   CRITICAL
+
+  @@schema("public")
 }
 
 /// Core models for users and patients, aligned with FHIR R4 principles.
@@ -73,6 +86,8 @@ model User {
   sentMessages    Message[]      @relation("SentMessages")
   receivedMessages Message[]      @relation("ReceivedMessages")
   auditLogs       AuditLog[]
+
+  @@schema("public")
 }
 
 model Patient {
@@ -92,6 +107,8 @@ model Patient {
   medicalHistory  MedicalHistory[]
   clinicalNotes   ClinicalNote[]
   documents       Document[]
+
+  @@schema("public")
 }
 
 /// Models related to patient care and clinical data.
@@ -108,6 +125,8 @@ model Appointment {
   patientId   String
   provider    User              @relation(fields: [providerId], references: [id])
   providerId  String
+
+  @@schema("public")
 }
 
 model MedicalHistory {
@@ -123,6 +142,8 @@ model MedicalHistory {
   // Relationships
   patient       Patient              @relation(fields: [patientId], references: [id])
   patientId     String
+
+  @@schema("public")
 }
 
 model ClinicalNote {
@@ -137,6 +158,8 @@ model ClinicalNote {
   patientId String
   author    User     @relation(fields: [authorId], references: [id])
   authorId  String
+
+  @@schema("public")
 }
 
 /// Supporting models for documentation, communication, workflow, and auditing.
@@ -152,6 +175,8 @@ model Document {
   // Relationships
   patient      Patient  @relation(fields: [patientId], references: [id])
   patientId    String
+
+  @@schema("public")
 }
 
 model Message {
@@ -164,6 +189,8 @@ model Message {
   senderId    String
   recipient   User     @relation("ReceivedMessages", fields: [recipientId], references: [id])
   recipientId String
+
+  @@schema("public")
 }
 
 model Task {
@@ -177,6 +204,8 @@ model Task {
   // Relationships
   assignedTo  User       @relation(fields: [assignedToId], references: [id])
   assignedToId String
+
+  @@schema("public")
 }
 
 model AuditLog {
@@ -188,4 +217,6 @@ model AuditLog {
   // Relationships
   user      User     @relation(fields: [userId], references: [id])
   userId    String
+
+  @@schema("public")
 }
