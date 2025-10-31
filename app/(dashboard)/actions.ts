@@ -81,24 +81,29 @@ export async function getRecentPatients(filter: string) {
 }
 
 export async function getHealthcareTeam() {
-  const providers = await prisma.user.findMany({
-    where: {
-      role: "DOCTOR",
-    },
-    take: 4,
-    select: {
-      id: true,
-      name: true,
-      role: true,
-    },
-  })
+  try {
+    const providers = await prisma.user.findMany({
+      where: {
+        role: "DOCTOR",
+      },
+      take: 4,
+      select: {
+        id: true,
+        name: true,
+        role: true,
+      },
+    })
 
-  // Mocking status and availability as they are not in the schema
-  return providers.map((p) => ({
-    id: p.id,
-    name: p.name || "Unnamed Provider",
-    role: p.role,
-    status: Math.random() > 0.5 ? "online" : "offline",
-    availability: "Available",
-  }))
+    // Mocking status and availability as they are not in the schema
+    return providers.map((p) => ({
+      id: p.id,
+      name: p.name || "Unnamed Provider",
+      role: p.role,
+      status: Math.random() > 0.5 ? "online" : "offline",
+      availability: "Available",
+    }))
+  } catch (error) {
+    console.error("Failed to get healthcare team:", error)
+    return []
+  }
 }

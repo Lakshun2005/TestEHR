@@ -92,6 +92,9 @@ export async function addPatient(formData: FormData) {
     return { success: true }
   } catch (error: any) {
     console.error("Failed to add patient:", error)
+    if (error.code === "P1001") {
+      return { success: false, message: "Could not connect to the database. Please check your connection and try again." }
+    }
     return { success: false, message: error.message || "Failed to add patient." }
   }
 }
